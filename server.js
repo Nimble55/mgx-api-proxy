@@ -2,39 +2,42 @@ const express = require('express');
 const axios = require('axios');
 const app = express();
 
-// Root route (optional, just to test server is running)
+// Allow JSON body parsing
+app.use(express.json());
+
+// Optional root route just to check if server is live
 app.get('/', (req, res) => {
-  res.send('Backend is running! Use /api/getData to fetch data.');
+  res.send('Backend is running! Use POST /api/getData to talk to Claude.');
 });
 
-// Endpoint for MGX to fetch data from Claude
-app.get('/api/getData', async (req, res) => {
+// Main route for MGX
+app.post('/api/getData', async (req, res) => {
   try {
-    const apiUrl = 'https://api.anthropic.com/v1/complete'; // Claude API endpoint
+    const prompt = req.body.prompt || "Hello from MGX!"; // Default prompt if none provided
 
-    // Make the request to Claude API
     const response = await axios.post(
-      apiUrl,
+      "https://api.anthropic.com/v1/messages",
       {
-        model: "claude-2",                  // model name
-        prompt: "Hello world",              // you can later make this dynamic
-        max_tokens_to_sample: 300           // adjust if needed
+        model: "claude-3-sonnet-20240229", // Use Claude 3 model
+        max_tokens: 300,
+        messages: [
+          { role: "user", content: prompt }
+        ]
       },
       {
         headers: {
-          'Authorization': `Bearer ${process.env.CLOUD_API_KEY}`, // uses Render env variable
-          'Content-Type': 'application/json'
+          "x-api-key": process.env.CLOUD_API_KEY, // Secure API key from Render
+          "Content-Type": "application/json",
+          "anthropic-version": "2023-06-01"
         }
       }
     );
 
-    // Send the API response back to MGX
-    res.json(response.data);
+    res.json(response.data); // Send Claude's reply back to MGX
 
   } catch (error) {
-    // Print full error to Render logs for debugging
-    console.error('Cloud API error:', error.response ? error.response.data : error.message);
-    res.status(500).json({ error: 'API request failed' });
+    console.error("Claude API error:", error.response ? error.response.data : error.message);
+    res.status(500).json({ error: "API request failed" });
   }
 });
 
